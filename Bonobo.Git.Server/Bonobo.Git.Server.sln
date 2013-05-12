@@ -3,7 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Libraries", "Libraries", "{4BE13CBA-FE8E-436A-B4A5-4D76D9908D0A}"
 	ProjectSection(SolutionItems) = preProject
-		Libraries\ICSharpCode.SharpZipLib.dll = Libraries\ICSharpCode.SharpZipLib.dll
 		Libraries\Microsoft.Practices.Unity.dll = Libraries\Microsoft.Practices.Unity.dll
 		Libraries\Tamir.SharpSSH.dll = Libraries\Tamir.SharpSSH.dll
 		Libraries\Ude.dll = Libraries\Ude.dll
