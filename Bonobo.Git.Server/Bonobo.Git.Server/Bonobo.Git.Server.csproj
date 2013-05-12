@@ -75,6 +75,10 @@
     <Reference Include="ICSharpCode.SharpZipLib, Version=0.85.4.369, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\Libraries\ICSharpCode.SharpZipLib.dll</HintPath>
     </Reference>
+    <Reference Include="LibGit2Sharp, Version=0.11.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\LibGit2Sharp.0.11.0.0\lib\net35\LibGit2Sharp.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Microsoft.Practices.Unity, Version=2.0.414.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -311,6 +315,7 @@
     <Content Include="Views\Team\Delete.cshtml" />
     <Content Include="Views\Repository\Delete.cshtml" />
     <Content Include="Views\Account\Delete.cshtml" />
+    <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GitSharp.Core\GitSharp.Core.csproj">
@@ -415,6 +420,10 @@
   </ProjectExtensions>
   <PropertyGroup>
     <PostBuildEvent>
-    </PostBuildEvent>
+if not exist "$(TargetDir)NativeBinaries" md "$(TargetDir)NativeBinaries"
+if not exist "$(TargetDir)NativeBinaries\x86" md "$(TargetDir)NativeBinaries\x86"
+xcopy /s /y "$(SolutionDir)packages\LibGit2Sharp.0.11.0.0\NativeBinaries\x86\*.*" "$(TargetDir)NativeBinaries\x86"
+if not exist "$(TargetDir)NativeBinaries\amd64" md "$(TargetDir)NativeBinaries\amd64"
+xcopy /s /y "$(SolutionDir)packages\LibGit2Sharp.0.11.0.0\NativeBinaries\amd64\*.*" "$(TargetDir)NativeBinaries\amd64"</PostBuildEvent>
   </PropertyGroup>
 </Project>
