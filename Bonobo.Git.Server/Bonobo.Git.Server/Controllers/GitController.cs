@@ -1,17 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
-using System.Web.Mvc;
-using GitSharp;
-using GitSharp.Core.Transport;
-using System.IO;
-using ICSharpCode.SharpZipLib.GZip;
-using Bonobo.Git.Server.Data;
+﻿using Bonobo.Git.Server.Configs;
 using Bonobo.Git.Server.Security;
 using Microsoft.Practices.Unity;
-using System.Configuration;
-using Bonobo.Git.Server.Configs;
+using System;
+using System.IO;
+using System.IO.Compression;
+using System.Web;
+using System.Web.Mvc;
 
 namespace Bonobo.Git.Server.Controllers
 {
@@ -72,15 +66,9 @@ namespace Bonobo.Git.Server.Controllers
             SetNoCache();
 
             var directory = GetDirectoryInfo(project);
-            if (GitSharp.Repository.IsValid(directory.FullName, true))
+            if (LibGit2Sharp.Repository.IsValid(directory.FullName))
             {
-                using (var repository = new GitSharp.Repository(directory.FullName))
-                using (var pack = new ReceivePack(repository))
-                {
-                    pack.setBiDirectionalPipe(false);
-                    pack.receive(GetInputStream(), Response.OutputStream, Response.OutputStream);
-                }
-
+                RunGitCmd("receive-pack", false, directory.FullName, GetInputStream(), Response.OutputStream);
                 return new EmptyResult();
             }
             else
@@ -95,15 +83,9 @@ namespace Bonobo.Git.Server.Controllers
             SetNoCache();
 
             var directory = GetDirectoryInfo(project);
-            if (GitSharp.Repository.IsValid(directory.FullName, true))
+            if (LibGit2Sharp.Repository.IsValid(directory.FullName))
             {
-                using (var repository = new GitSharp.Repository(directory.FullName))
-                using (var pack = new UploadPack(repository))
-                {
-                    pack.setBiDirectionalPipe(false);
-                    pack.Upload(GetInputStream(), Response.OutputStream, Response.OutputStream);
-                }
-
+                RunGitCmd("upload-pack", false, directory.FullName, GetInputStream(), Response.OutputStream);
                 return new EmptyResult();
             }
             else
@@ -122,27 +104,10 @@ namespace Bonobo.Git.Server.Controllers
             Response.Write(FlushMessage());
 
             var directory = GetDirectoryInfo(project);
-            if (GitSharp.Repository.IsValid(directory.FullName, true))
+
+            if (LibGit2Sharp.Repository.IsValid(directory.FullName))
             {
-                using (var repository = new GitSharp.Repository(directory.FullName))
-                {
-                    if (String.Equals("git-receive-pack", service, StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        using (var pack = new ReceivePack(repository))
-                        {
-                            pack.SendAdvertisedRefs(new RefAdvertiser.PacketLineOutRefAdvertiser(new PacketLineOut(Response.OutputStream)));
-                        }
-
-                    }
-                    else if (String.Equals("git-upload-pack", service, StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        using (var pack = new UploadPack(repository))
-                        {
-                            pack.SendAdvertisedRefs(new RefAdvertiser.PacketLineOutRefAdvertiser(new PacketLineOut(Response.OutputStream)));
-                        }
-                    }
-                }
-
+                RunGitCmd(service.Substring(4), true, directory.FullName, GetInputStream(), Response.OutputStream);
                 return new EmptyResult();
             }
             else
@@ -177,7 +142,7 @@ namespace Bonobo.Git.Server.Controllers
         {
             if (Request.Headers["Content-Encoding"] == "gzip")
             {
-                return new GZipInputStream(Request.InputStream);
+                return new GZipStream(Request.InputStream, CompressionMode.Decompress);
             }
             return Request.InputStream;
         }
@@ -187,6 +152,33 @@ namespace Bonobo.Git.Server.Controllers
             Response.AddHeader("Expires", "Fri, 01 Jan 1980 00:00:00 GMT");
             Response.AddHeader("Pragma", "no-cache");
             Response.AddHeader("Cache-Control", "no-cache, max-age=0, must-revalidate");
+        }
+
+        public void RunGitCmd(string serviceName, bool advertiseRefs, string workingDir, Stream inStream, Stream outStream)
+        {
+            var args = serviceName + " --stateless-rpc";
+            if (advertiseRefs)
+                args += " --advertise-refs";
+            args += " \"" + workingDir + "\"";
+
+            var info = new System.Diagnostics.ProcessStartInfo(UserConfiguration.Current.GitExePath, args)
+            {
+                CreateNoWindow = true,
+                RedirectStandardError = true,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                WorkingDirectory = Path.GetDirectoryName(UserConfiguration.Current.Repositories),
+            };
+
+            using (var process = System.Diagnostics.Process.Start(info))
+            {
+                inStream.CopyTo(process.StandardInput.BaseStream);
+                process.StandardInput.Write('\0');
+                process.StandardOutput.BaseStream.CopyTo(outStream);
+
+                process.WaitForExit();
+            }
         }
     }
 }

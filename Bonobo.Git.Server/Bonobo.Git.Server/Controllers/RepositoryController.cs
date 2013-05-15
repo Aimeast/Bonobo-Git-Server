@@ -109,7 +109,7 @@ namespace Bonobo.Git.Server.Controllers
                     string path = Path.Combine(UserConfiguration.Current.Repositories, model.Name);
                     if (!Directory.Exists(path))
                     {
-                        using (var repository = Repository.Init(path))
+                        using (var repository = Repository.Init(path, true))
                         {
                         }
                         TempData["CreateSuccess"] = true;

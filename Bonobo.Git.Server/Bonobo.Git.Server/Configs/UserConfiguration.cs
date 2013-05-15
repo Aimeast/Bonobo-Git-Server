@@ -9,5 +9,6 @@ namespace Bonobo.Git.Server.Configs
         public string Repositories { get; set; }
         public bool AllowUserRepositoryCreation { get; set; }
         public bool AllowAnonymousRegistration { get; set; }
+        public string GitExePath { get; set; }
     }
 }
