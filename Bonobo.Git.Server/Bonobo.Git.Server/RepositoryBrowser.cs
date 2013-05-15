@@ -1,166 +1,134 @@
-﻿using System;
+﻿using Bonobo.Git.Server.Models;
+using LibGit2Sharp;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Web;
-using Bonobo.Git.Server.Models;
-using GitSharp;
 
 namespace Bonobo.Git.Server
 {
     public class RepositoryBrowser : IDisposable
     {
         private Repository _repository;
-        private string _repositoryPath;
-        private bool IsDisposed { get; set; }
+        private bool _isDisposed;
 
         public RepositoryBrowser(string repositoryPath)
         {
-            _repositoryPath = repositoryPath;
+            _repository = new Repository(repositoryPath);
         }
 
         public IEnumerable<string> GetBranches()
         {
-            if (!EnsureRepository())
-            {
-                return null;
-            }
-            return _repository.Branches.Select(i => i.Value.Name);
+            return _repository.Branches.Select(s => s.Name).ToList();
         }
 
-        public Leaf GetLeaf(string name, string path)
+        public IEnumerable<RepositoryCommitModel> GetCommits(string name, out string branchName)
         {
-            if (!EnsureRepository())
-            {
-                return null;
-            }
+            branchName = "";
 
-            Branch branch = null;
-            Tree source = null;
-            Commit commit = null;
-            if (TryGetBranch(name, out branch))
-            {
-                if (branch == null)
-                {
-                    return null;
-                }
-                source = (branch.Target as Commit).Tree;
-            }
-            else if (TryGetCommit(name, out commit))
-            {
-                source = commit.Tree;
-            }
-            else
-            {
-                return null;
-            }
-
-            return GetTreeNode(source, path) as Leaf;
-        }
-
-        public IEnumerable<RepositoryCommitModel> GetCommits(string branch, out string branchName)
-        {
             var result = new List<RepositoryCommitModel>();
-            branchName = null;
-            if (!EnsureRepository())
-            {
-                return null;
-            }
 
-            Branch currentBranch;
-            if (!TryGetBranch(branch, out currentBranch))
-            {
-                return null;
-            }
+            Branch branch;
+            Commit commit = GetCommitByName(name, out branch);
 
-            if (currentBranch == null)
-            {
+            if (commit == null)
                 return result;
-            }
+            if (branch != null)
+                branchName = branch.Name;
 
-            branchName = currentBranch.Name;
+            var ancestors = _repository.Commits.QueryBy(new Filter { Since = commit, SortBy = GitSortOptions.Topological });
+            result.AddRange(ancestors.Select(s => ConvertToRepositoryCommitModel(s)));
 
-
-            if (currentBranch.CurrentCommit != null)
-            {
-                result.Add(ConvertToRepositoryCommitModel(currentBranch.CurrentCommit));
-                result.AddRange(currentBranch.CurrentCommit.Ancestors.Select(i => ConvertToRepositoryCommitModel(i)));
-            }
-
-            return result.OrderByDescending(i => i.Date);
+            return result;
         }
 
         public RepositoryCommitModel GetCommitDetail(string id)
         {
-            if (!EnsureRepository())
-            {
+            var commit = _repository.Commits.FirstOrDefault(s => s.Sha == id);
+            if (commit == null)
                 return null;
-            }
-
-            Commit commit;
-            if (TryGetCommit(id, out commit))
-            {
-                return ConvertToRepositoryCommitModel(commit);
-            }
-            return null;
+            else
+                return ConvertToRepositoryCommitModel(commit, true);
         }
 
-        public IEnumerable<RepositoryTreeDetailModel> Browse(string treeName, string path)
-        {
-            string b;
-            return Browse(treeName, path, out b);
-        }
-
-        public IEnumerable<RepositoryTreeDetailModel> Browse(string name, string path, out string branchName)
+        public IEnumerable<RepositoryTreeDetailModel> BrowseTree(string name, string path, out string branchName)
         {
             branchName = null;
-            if (!EnsureRepository())
-            {
-                return null;
-            }
+            if (path == null)
+                path = "";
 
             var result = new List<RepositoryTreeDetailModel>();
 
-            Tree source = null;
-            Branch branch = null;
-            Commit commit = null;
-            if (TryGetBranch(name, out branch))
-            {
-                if (branch == null)
-                {
-                    return result;
-                }
+            Branch branch;
+            Commit commit = GetCommitByName(name, out branch);
+
+            if (commit == null)
+                return result;
+            if (branch != null)
                 branchName = branch.Name;
-                source = (branch.Target as Commit).Tree;
-            }
-            else if (TryGetCommit(name, out commit))
-            {
-                source = commit.Tree;
-            }
-            else
-            {
-                return null;
-            }
 
-            AbstractTreeNode treeNode = GetTreeNode(source, path);
-            if (treeNode == null)
-            {
-                return null;
-            }
+            var ancestors = _repository.Commits.QueryBy(new Filter { Since = commit, SortBy = GitSortOptions.Topological });
+            var q = from item in string.IsNullOrEmpty(path) ? commit.Tree : (Tree)commit[path].Target
+                    let lastCommit = ancestors.TakeWhile(c =>
+                    {
+                        var entry = c[item.Path];
+                        if (entry == null)
+                            return false;
+                        return entry.Target == item.Target;
+                    }).Last()
+                    select new RepositoryTreeDetailModel
+                    {
+                        Name = item.Name,
+                        IsTree = item.TargetType == TreeEntryTargetType.Tree,
+                        CommitDate = lastCommit.Author.When.LocalDateTime,
+                        CommitMessage = lastCommit.MessageShort,
+                        Author = lastCommit.Author.Name,
+                        TreeName = branch.Name ?? name,
+                        Path = item.Path.Replace('\\', '/'),
+                    };
+            return q.ToList();
+        }
 
-            if (treeNode.IsTree)
+        public RepositoryTreeDetailModel BrowseBlob(string name, string path, out string branchName)
+        {
+            branchName = null;
+            if (path == null)
+                path = "";
+
+            Branch branch;
+            Commit commit = GetCommitByName(name, out branch);
+
+            if (commit == null)
+                return null;
+            if (branch != null)
+                branchName = branch.Name;
+
+            var tree = commit.Tree;
+            var dirs = path.Split(new char[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            TreeEntry entry;
+            foreach (var dir in dirs.Take(dirs.Length - 1))
             {
-                foreach (AbstractTreeNode item in ((Tree)treeNode).Children)
-                {
-                    result.Add(ConvertToRepositoryDetailModel(item, GetLastCommit(item, branch, commit), name, branch));
-                }
+                entry = tree.FirstOrDefault(s => s.TargetType == TreeEntryTargetType.Tree && s.Name == dir);
+
+                if (entry == null)
+                    return null;
+                tree = (Tree)entry.Target;
             }
-            else if (treeNode as Leaf != null)
+            entry = tree.FirstOrDefault(s => s.TargetType == TreeEntryTargetType.Blob && s.Name == dirs.Last());
+            if (entry == null)
+                return null;
+            var blob = (Blob)entry.Target;
+
+            return new RepositoryTreeDetailModel
             {
-                var model = ConvertToRepositoryDetailModel(treeNode, GetLastCommit(treeNode, branch, commit), name, branch);
-                model.Data = ((Leaf)treeNode).RawData;
-                result.Add(model);
-            }
-            return result;
+                Name = dirs.Last(),
+                IsTree = false,
+                CommitDate = commit.Author.When.LocalDateTime,
+                CommitMessage = commit.Message,
+                Author = commit.Author.Name,
+                TreeName = branchName ?? name,
+                Path = path,
+                Data = blob.Content,
+            };
         }
 
         public void Dispose()
@@ -173,7 +141,7 @@ namespace Bonobo.Git.Server
         {
             try
             {
-                if (!this.IsDisposed)
+                if (!this._isDisposed)
                 {
                     if (isDisposing)
                     {
@@ -186,140 +154,53 @@ namespace Bonobo.Git.Server
             }
             finally
             {
-                this.IsDisposed = true;
+                this._isDisposed = true;
             }
         }
 
-        protected bool EnsureRepository()
+        private Commit GetCommitByName(string name, out Branch branch)
         {
-            if (_repository != null && _repository.Directory == _repositoryPath)
-            {
-                return true;
-            }
+            Commit commit = null;
+            branch = string.IsNullOrEmpty(name) ? _repository.Head : _repository.Branches[name];
+            if (branch != null && branch.Tip != null)
+                commit = branch.Tip;
 
-            if (!GitSharp.Repository.IsValid(_repositoryPath, true))
+            if (commit == null && name != null)
             {
-                return false;
+                var tag = _repository.Tags[name];
+                if (tag != null)
+                    name = tag.Target.Sha;
+
+                commit = _repository.Commits.FirstOrDefault(s => s.Sha == name);
             }
-            _repository = new Repository(_repositoryPath);
-            return true;
+            return commit;
         }
 
-        private Commit GetLastCommit(AbstractTreeNode item, Branch branch, Commit commit)
+        private RepositoryCommitModel ConvertToRepositoryCommitModel(Commit commit, bool withDiff = false)
         {
-            if (branch != null)
-            {
-                return item.GetLastCommit(branch);
-            }
-            else if (commit != null)
-            {
-                return item.GetLastCommitBefore(commit);
-            }
-
-            return null;
-        }
-
-        private RepositoryTreeDetailModel ConvertToRepositoryDetailModel(AbstractTreeNode item, Commit lastCommit, string treeName, Branch branch)
-        {
-            return new RepositoryTreeDetailModel
-            {
-                Name = item.Name,
-                IsTree = item.IsTree,
-                CommitDate = lastCommit != null ? new DateTime?(lastCommit.AuthorDate.LocalDateTime) : null,
-                CommitMessage = lastCommit != null ? lastCommit.Message : null,
-                Author = lastCommit != null ? lastCommit.Author.Name : null,
-                Tree = String.IsNullOrEmpty(treeName) ? branch.Name : treeName,
-                Path = item.Path,
-                Hash = item.Hash,
-            };
-        }
-
-        private AbstractTreeNode GetTreeNode(Tree source, string path)
-        {
-            if (String.IsNullOrEmpty(path))
-            {
-                return source;
-            }
-
-            var dirs = path.Split(new char[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-            AbstractTreeNode currentTree = source;
-            foreach (var item in dirs)
-            {
-                if (currentTree.IsTree)
-                {
-                    var result = ((Tree)currentTree).Children.FirstOrDefault(i => ((AbstractTreeNode)i).Name == item);
-                    if (result == null)
-                    {
-                        return null;
-                    }
-                    else
-                    {
-                        currentTree = (AbstractTreeNode)result;
-                    }
-                }
-            }
-
-            return currentTree;
-        }
-
-        private bool TryGetCommit(string treeName, out Commit commit)
-        {
-            commit = null;
-            try
-            {
-                var current = new Commit(_repository, treeName);
-                if (current.IsCommit)
-                {
-                    commit = current;
-                    return true;
-                }
-            }
-            catch (ArgumentException)
-            {
-                return false;
-            }
-
-            return false;
-        }
-
-        private bool TryGetBranch(string branchName, out Branch branch)
-        {
-            if (string.IsNullOrEmpty(branchName))
-            {
-                branch = _repository.Branches.Where(i => i.Value.Target.Hash == _repository.Head.Target.Hash).FirstOrDefault().Value;
-                return true;
-            }
-            else
-            {
-                branch = new Branch(_repository, branchName);
-                if (branch.IsBranch)
-                {
-                    return true;
-                }
-            }
-            branch = null;
-            return false;
-        }
-
-        private RepositoryCommitModel ConvertToRepositoryCommitModel(Commit commit)
-        {
-            return new RepositoryCommitModel
+            var model = new RepositoryCommitModel
             {
                 Author = commit.Author.Name,
-                AuthorEmail = commit.Author.EmailAddress,
-                Date = commit.AuthorDate.LocalDateTime,
-                ID = commit.Hash,
-                Message = commit.Message,
-                TreeID = commit.Tree.Hash,
-                Parents = commit.Parents.Select(i => i.Hash).ToArray(),
-                Changes = commit.Changes.Select(i => new RepositoryCommitChangeModel
-                {
-                    Name = i.Name,
-                    Path = i.Path,
-                    Type = i.ChangeType,
-                }),
+                AuthorEmail = commit.Author.Email,
+                Date = commit.Author.When.LocalDateTime,
+                ID = commit.Sha,
+                Message = commit.MessageShort,
+                TreeID = commit.Tree.Sha,
+                Parents = commit.Parents.Select(i => i.Sha).ToArray(),
             };
+            if (withDiff)
+            {
+                TreeChanges changes = commit.Parents.Count() == 0
+                    ? _repository.Diff.Compare(null, commit.Tree)
+                    : _repository.Diff.Compare(commit.Parents.First().Tree, commit.Tree);
+                model.Changes = changes.OrderBy(s => s.Path).Select(i => new RepositoryCommitChangeModel
+                {
+                    //Name = i.Name,
+                    Path = i.Path,
+                    Status = i.Status,
+                });
+            }
+            return model;
         }
-
     }
 }

@@ -129,7 +129,6 @@
     <Compile Include="Configs\UserConfiguration.cs" />
     <Compile Include="Controllers\AccountController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
-    <Compile Include="Controllers\ImageController.cs" />
     <Compile Include="Controllers\RepositoryController.cs" />
     <Compile Include="Controllers\SettingsController.cs" />
     <Compile Include="Controllers\TeamController.cs" />
@@ -315,6 +314,7 @@
     <Content Include="Views\Team\Delete.cshtml" />
     <Content Include="Views\Repository\Delete.cshtml" />
     <Content Include="Views\Account\Delete.cshtml" />
+    <Content Include="Views\Repository\Blob.cshtml" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
