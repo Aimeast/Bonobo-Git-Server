@@ -66,15 +66,13 @@ namespace Bonobo.Git.Server
             if (branch != null)
                 branchName = branch.Name;
 
-            var ancestors = _repository.Commits.QueryBy(new Filter { Since = commit, SortBy = GitSortOptions.Topological });
+            var ancestors = _repository.Commits.QueryBy(new Filter { Since = commit, SortBy = GitSortOptions.Topological | GitSortOptions.Reverse });
             var q = from item in string.IsNullOrEmpty(path) ? commit.Tree : (Tree)commit[path].Target
-                    let lastCommit = ancestors.TakeWhile(c =>
+                    let lastCommit = ancestors.First(c =>
                     {
                         var entry = c[item.Path];
-                        if (entry == null)
-                            return false;
-                        return entry.Target == item.Target;
-                    }).Last()
+                        return entry != null && entry.Target == item.Target;
+                    })
                     select new RepositoryTreeDetailModel
                     {
                         Name = item.Name,
