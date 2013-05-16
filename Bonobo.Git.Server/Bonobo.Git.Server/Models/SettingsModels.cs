@@ -21,5 +21,9 @@ namespace Bonobo.Git.Server.Models
         [Required(ErrorMessageResourceType = typeof(Resources), ErrorMessageResourceName = "Validation_Required")]
         [Display(ResourceType = typeof(Resources), Name = "Settings_Global_RepositoryPath")]
         public string RepositoryPath { get; set; }
+
+        [Required(ErrorMessageResourceType = typeof(Resources), ErrorMessageResourceName = "Validation_Required")]
+        [Display(ResourceType = typeof(Resources), Name = "Settings_Global_GitExePath")]
+        public string GitExePath { get; set; }
     }
 }

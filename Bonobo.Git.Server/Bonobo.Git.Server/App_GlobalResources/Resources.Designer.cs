@@ -1429,6 +1429,15 @@ namespace Bonobo.Git.Server.App_GlobalResources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Not support preview for this file..
+        /// </summary>
+        public static string Repository_Tree_PreviewNotSupported {
+            get {
+                return ResourceManager.GetString("Repository_Tree_PreviewNotSupported", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Browse Repository.
         /// </summary>
         public static string Repository_Tree_Title {
@@ -1506,6 +1515,24 @@ namespace Bonobo.Git.Server.App_GlobalResources {
         public static string Settings_Global_DirectoryHint {
             get {
                 return ResourceManager.GetString("Settings_Global_DirectoryHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to git.exe File Path.
+        /// </summary>
+        public static string Settings_Global_GitExePath {
+            get {
+                return ResourceManager.GetString("Settings_Global_GitExePath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to For support pushing and fetching commands..
+        /// </summary>
+        public static string Settings_Global_GitExePathHit {
+            get {
+                return ResourceManager.GetString("Settings_Global_GitExePathHit", resourceCulture);
             }
         }
         

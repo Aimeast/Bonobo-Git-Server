@@ -20,7 +20,7 @@
             <p class="formHint">              
             </p> 
         </div> 
-        <div class="ctrlHolder"> 
+        <div class="ctrlHolder">
             @Html.LabelFor(m => m.RepositoryPath)
             @Html.TextBoxFor(m => m.RepositoryPath, new { @class = "textInput" })<em>*</em>
             <p class="formHint">
@@ -28,6 +28,14 @@
               @Resources.Settings_Global_DirectoryHint
             </p> 
         </div> 
+        <div class="ctrlHolder">
+            @Html.LabelFor(m => m.GitExePath)
+            @Html.TextBoxFor(m => m.GitExePath, new { @class = "textInput" })<em>*</em>
+            <p class="formHint">
+              @Html.ValidationMessageFor(m => m.GitExePath)
+              @Resources.Settings_Global_GitExePathHit
+            </p>
+        </div>
         <div class="ctrlHolder noLabel"> 
             <label for="AllowAnonymousRegistration">@Html.CheckBoxFor(m => m.AllowAnonymousRegistration) @Model.GetType().GetDisplayValue("AllowAnonymousRegistration")</label>
             <p class="formHint">     

@@ -66,6 +66,7 @@ namespace Bonobo.Git.Server
             if (branch != null)
                 branchName = branch.Name;
 
+            var branchNameTemp = branchName;
             var ancestors = _repository.Commits.QueryBy(new Filter { Since = commit, SortBy = GitSortOptions.Topological | GitSortOptions.Reverse });
             var q = from item in string.IsNullOrEmpty(path) ? commit.Tree : (Tree)commit[path].Target
                     let lastCommit = ancestors.First(c =>
@@ -80,7 +81,7 @@ namespace Bonobo.Git.Server
                         CommitDate = lastCommit.Author.When.LocalDateTime,
                         CommitMessage = lastCommit.MessageShort,
                         Author = lastCommit.Author.Name,
-                        TreeName = branch.Name ?? name,
+                        TreeName = branchNameTemp ?? name,
                         Path = item.Path.Replace('\\', '/'),
                     };
             return q.ToList();

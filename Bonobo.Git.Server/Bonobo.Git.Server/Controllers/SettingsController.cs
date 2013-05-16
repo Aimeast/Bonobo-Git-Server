@@ -16,13 +16,14 @@ namespace Bonobo.Git.Server.Controllers
     {
         [FormsAuthorizeAttribute(Roles = Definitions.Roles.Administrator)]
         public ActionResult Index()
-        {            
+        {
             return View(new GlobalSettingsModel
             {
                 AllowAnonymousPush = UserConfiguration.Current.AllowAnonymousPush,
                 RepositoryPath = UserConfiguration.Current.Repositories,
                 AllowAnonymousRegistration = UserConfiguration.Current.AllowAnonymousRegistration,
                 AllowUserRepositoryCreation = UserConfiguration.Current.AllowUserRepositoryCreation,
+                GitExePath = UserConfiguration.Current.GitExePath,
             });
         }
 
@@ -42,6 +43,7 @@ namespace Bonobo.Git.Server.Controllers
                         UserConfiguration.Current.Repositories = model.RepositoryPath;
                         UserConfiguration.Current.AllowAnonymousRegistration = model.AllowAnonymousRegistration;
                         UserConfiguration.Current.AllowUserRepositoryCreation = model.AllowUserRepositoryCreation;
+                        UserConfiguration.Current.GitExePath = model.GitExePath;
                         UserConfiguration.Current.Save();
 
                         ViewBag.UpdateSuccess = true;
