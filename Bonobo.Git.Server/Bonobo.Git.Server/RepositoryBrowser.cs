@@ -21,19 +21,19 @@ namespace Bonobo.Git.Server
             return _repository.Branches.Select(s => s.Name).ToList();
         }
 
-        public IEnumerable<RepositoryCommitModel> GetCommits(string name, out string branchName)
+        public IEnumerable<string> GetTags()
         {
-            branchName = "";
+            return _repository.Tags.Select(s => s.Name).ToList();
+        }
 
+        public IEnumerable<RepositoryCommitModel> GetCommits(string name, out string referenceName)
+        {
             var result = new List<RepositoryCommitModel>();
 
-            Branch branch;
-            Commit commit = GetCommitByName(name, out branch);
+            Commit commit = GetCommitByName(name, out referenceName);
 
             if (commit == null)
                 return result;
-            if (branch != null)
-                branchName = branch.Name;
 
             var ancestors = _repository.Commits.QueryBy(new Filter { Since = commit, SortBy = GitSortOptions.Topological });
             result.AddRange(ancestors.Select(s => ConvertToRepositoryCommitModel(s)));
@@ -41,32 +41,29 @@ namespace Bonobo.Git.Server
             return result;
         }
 
-        public RepositoryCommitModel GetCommitDetail(string id)
+        public RepositoryCommitModel GetCommitDetail(string name)
         {
-            var commit = _repository.Commits.FirstOrDefault(s => s.Sha == id);
+            string referenceName;
+            var commit = GetCommitByName(name, out referenceName);
             if (commit == null)
                 return null;
             else
                 return ConvertToRepositoryCommitModel(commit, true);
         }
 
-        public IEnumerable<RepositoryTreeDetailModel> BrowseTree(string name, string path, out string branchName)
+        public IEnumerable<RepositoryTreeDetailModel> BrowseTree(string name, string path, out string referenceName)
         {
-            branchName = null;
             if (path == null)
                 path = "";
 
             var result = new List<RepositoryTreeDetailModel>();
 
-            Branch branch;
-            Commit commit = GetCommitByName(name, out branch);
+            Commit commit = GetCommitByName(name, out referenceName);
 
             if (commit == null)
                 return result;
-            if (branch != null)
-                branchName = branch.Name;
 
-            var branchNameTemp = branchName;
+            var branchNameTemp = referenceName;
             var ancestors = _repository.Commits.QueryBy(new Filter { Since = commit, SortBy = GitSortOptions.Topological | GitSortOptions.Reverse });
             var q = from item in string.IsNullOrEmpty(path) ? commit.Tree : (Tree)commit[path].Target
                     let lastCommit = ancestors.First(c =>
@@ -87,19 +84,15 @@ namespace Bonobo.Git.Server
             return q.ToList();
         }
 
-        public RepositoryTreeDetailModel BrowseBlob(string name, string path, out string branchName)
+        public RepositoryTreeDetailModel BrowseBlob(string name, string path, out string referenceName)
         {
-            branchName = null;
             if (path == null)
                 path = "";
 
-            Branch branch;
-            Commit commit = GetCommitByName(name, out branch);
+            Commit commit = GetCommitByName(name, out referenceName);
 
             if (commit == null)
                 return null;
-            if (branch != null)
-                branchName = branch.Name;
 
             var tree = commit.Tree;
             var dirs = path.Split(new char[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
@@ -124,7 +117,7 @@ namespace Bonobo.Git.Server
                 CommitDate = commit.Author.When.LocalDateTime,
                 CommitMessage = commit.Message,
                 Author = commit.Author.Name,
-                TreeName = branchName ?? name,
+                TreeName = referenceName ?? name,
                 Path = path,
                 Data = blob.Content,
             };
@@ -157,22 +150,31 @@ namespace Bonobo.Git.Server
             }
         }
 
-        private Commit GetCommitByName(string name, out Branch branch)
+        private Commit GetCommitByName(string name, out string referenceName)
         {
-            Commit commit = null;
-            branch = string.IsNullOrEmpty(name) ? _repository.Head : _repository.Branches[name];
-            if (branch != null && branch.Tip != null)
-                commit = branch.Tip;
+            referenceName = null;
 
-            if (commit == null && name != null)
+            if (string.IsNullOrEmpty(name))
             {
-                var tag = _repository.Tags[name];
-                if (tag != null)
-                    name = tag.Target.Sha;
-
-                commit = _repository.Commits.FirstOrDefault(s => s.Sha == name);
+                referenceName = _repository.Head.Name;
+                return _repository.Head.Tip;
             }
-            return commit;
+
+            var branch = _repository.Branches[name];
+            if (branch != null && branch.Tip != null)
+            {
+                referenceName = branch.Name;
+                return branch.Tip;
+            }
+
+            var tag = _repository.Tags[name];
+            if (tag != null)
+            {
+                referenceName = tag.Name;
+                return tag.Target as Commit;
+            }
+
+            return _repository.Lookup(name) as Commit;
         }
 
         private RepositoryCommitModel ConvertToRepositoryCommitModel(Commit commit, bool withDiff = false)
@@ -195,7 +197,7 @@ namespace Bonobo.Git.Server
                 model.Changes = changes.OrderBy(s => s.Path).Select(i => new RepositoryCommitChangeModel
                 {
                     //Name = i.Name,
-                    Path = i.Path,
+                    Path = i.Path.Replace('\\', '/'),
                     Status = i.Status,
                 });
             }

@@ -182,9 +182,9 @@ namespace Bonobo.Git.Server.Controllers
             {
                 using (var browser = new RepositoryBrowser(Path.Combine(UserConfiguration.Current.Repositories, id)))
                 {
-                    string branchName;
-                    var files = browser.BrowseTree(name, path, out branchName);
-                    PopulateBranchesData(browser, branchName);
+                    string referenceName;
+                    var files = browser.BrowseTree(name, path, out referenceName);
+                    PopulateBranchesData(browser, referenceName);
                     PopulateAddressBarData(name, path);
 
                     var model = new RepositoryTreeModel();
@@ -205,9 +205,9 @@ namespace Bonobo.Git.Server.Controllers
             {
                 using (var browser = new RepositoryBrowser(Path.Combine(UserConfiguration.Current.Repositories, id)))
                 {
-                    string branchName;
-                    var model = browser.BrowseBlob(name, path, out branchName);
-                    PopulateBranchesData(browser, branchName);
+                    string referenceName;
+                    var model = browser.BrowseBlob(name, path, out referenceName);
+                    PopulateBranchesData(browser, referenceName);
                     PopulateAddressBarData(name, path);
 
                     model.Text = FileDisplayHandler.GetText(model.Data);
@@ -231,8 +231,8 @@ namespace Bonobo.Git.Server.Controllers
             {
                 using (var browser = new RepositoryBrowser(Path.Combine(UserConfiguration.Current.Repositories, id)))
                 {
-                    string branchName;
-                    var model = browser.BrowseBlob(name, path, out branchName);
+                    string referenceName;
+                    var model = browser.BrowseBlob(name, path, out referenceName);
 
                     return File(model.Data, "application/octet-stream", model.Name);
                 }
@@ -248,9 +248,9 @@ namespace Bonobo.Git.Server.Controllers
             {
                 using (var browser = new RepositoryBrowser(Path.Combine(UserConfiguration.Current.Repositories, id)))
                 {
-                    string currentBranchName;
-                    var commits = browser.GetCommits(name, out currentBranchName);
-                    PopulateBranchesData(browser, currentBranchName);
+                    string referenceName;
+                    var commits = browser.GetCommits(name, out referenceName);
+                    PopulateBranchesData(browser, referenceName);
                     return View(new RepositoryCommitsModel { Commits = commits, Name = id });
                 }
             }
@@ -281,10 +281,11 @@ namespace Bonobo.Git.Server.Controllers
             ViewData["name"] = name;
         }
 
-        private void PopulateBranchesData(RepositoryBrowser browser, string branchName)
+        private void PopulateBranchesData(RepositoryBrowser browser, string referenceName)
         {
-            ViewData["currentBranch"] = branchName;
+            ViewData["referenceName"] = referenceName;
             ViewData["branches"] = browser.GetBranches();
+            ViewData["tags"] = browser.GetTags();
         }
 
         private void PopulateEditData()
