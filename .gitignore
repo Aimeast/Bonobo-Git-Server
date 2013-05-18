@@ -36,7 +36,7 @@ Thumbs.db
 *.sbr
 *.Publish.xml
 obj/
-[Bb]in
+#[Bb]in
 [Dd]ebug*/
 [Rr]elease*/
 
@@ -46,4 +46,7 @@ obj/
 #Project files
 [Bb]uild/
 
-[Aa]pp_[Dd]ata
+*/*/[Aa]pp_[Dd]ata/*
+!*/*/[Aa]pp_[Dd]ata/[Ww]eb.config
+*/*/[Bb]in/*
+!*/*/[Bb]in/[Ww]eb.config
